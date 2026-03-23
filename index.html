@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Citas APA 7</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,300&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #1a1a2e;
+  --paper: #faf7f2;
+  --cream: #f0ebe0;
+  --gold: #c9a84c;
+  --ok: #1e6b45;
+  --err: #8b1a1a;
+  --ok-bg: #e8f5ee;
+  --err-bg: #fdf0f0;
+  --muted: #6b6560;
+  --border: #d4c9b8;
+  --shadow: rgba(26,26,46,0.10);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--paper); color: var(--ink);
+  min-height: 100vh; padding-bottom: 60px;
+}
+header {
+  background: var(--ink); padding: 30px 40px 26px;
+  position: relative; overflow: hidden;
+}
+header::before {
+  content:''; position:absolute; inset:0;
+  background: repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(201,168,76,0.04) 40px,rgba(201,168,76,0.04) 41px);
+}
+header::after {
+  content:''; position:absolute; bottom:0; left:40px; right:40px; height:2px;
+  background: linear-gradient(90deg,transparent,var(--gold),transparent);
+}
+.hi { max-width:880px; margin:0 auto; position:relative; }
+.tag { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); letter-spacing:3px; text-transform:uppercase; margin-bottom:8px; opacity:.8; }
+h1 { font-family:'Playfair Display',serif; font-size:clamp(22px,4vw,34px); color:#fff; line-height:1.15; font-weight:700; }
+h1 em { color:var(--gold); font-style:italic; }
+.sub { margin-top:6px; font-size:14px; color:rgba(255,255,255,.5); font-style:italic; }
+
+.wrap { max-width:880px; margin:0 auto; padding:0 24px; }
+
+/* REFERENCE CARDS */
+.ref-panel { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:32px 0 24px; }
+.ref-card { background:var(--cream); border:1px solid var(--border); border-left:4px solid var(--gold); border-radius:6px; padding:14px 18px; }
+.ref-label { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
+.ref-title { font-size:13px; font-weight:600; color:var(--ink); margin-bottom:4px; }
+.ref-desc { font-size:12.5px; color:var(--muted); font-style:italic; line-height:1.5; }
+.ref-fmt { margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:12px; background:rgba(0,0,0,.05); padding:5px 9px; border-radius:4px; color:var(--ink); }
+
+/* CONTROLS */
+.controls { display:flex; gap:12px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }
+.btn-gen { font-family:'Playfair Display',serif; font-size:15px; font-weight:700; color:var(--ink); background:var(--gold); border:none; border-radius:6px; padding:11px 26px; cursor:pointer; transition:all .2s; box-shadow:0 2px 8px rgba(201,168,76,.35); }
+.btn-gen:hover { background:#b8953e; transform:translateY(-1px); }
+.btn-gen:active { transform:translateY(0); }
+.btn-rst { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--muted); background:transparent; border:1.5px solid var(--border); border-radius:6px; padding:9px 16px; cursor:pointer; transition:all .2s; }
+.btn-rst:hover { color:var(--err); border-color:var(--err); background:var(--err-bg); }
+.scoreboard { margin-left:auto; font-family:'JetBrains Mono',monospace; display:flex; gap:18px; }
+.sc-item strong { display:block; text-align:center; font-size:20px; color:var(--ink); }
+.sc-item span { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+
+/* PROGRESS */
+.prog-wrap { background:var(--cream); border-radius:4px; height:6px; overflow:hidden; margin-bottom:22px; }
+.prog-fill { height:100%; background:linear-gradient(90deg,var(--gold),#e8a030); border-radius:4px; transition:width .4s ease; width:0%; }
+
+/* FEEDBACK */
+.feedback { border-radius:8px; padding:20px 24px; margin-bottom:18px; border-left:5px solid; display:none; }
+.feedback.ok  { display:block; background:var(--ok-bg);  border-color:var(--ok);  animation:fin .3s ease; }
+.feedback.err { display:block; background:var(--err-bg); border-color:var(--err); animation:fin .3s ease; }
+@keyframes fin { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+.fb-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.fb-icon { font-size:22px; }
+.fb-title { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; }
+.feedback.ok  .fb-title { color:var(--ok); }
+.feedback.err .fb-title { color:var(--err); }
+.fb-body { font-size:14px; line-height:1.75; color:#333; }
+.fb-body strong { color:var(--ink); }
+
+/* Cita usada (replay) */
+.fb-cita-usada {
+  background: rgba(0,0,0,0.05); border-left:3px solid var(--border);
+  border-radius:5px; padding:12px 16px;
+  font-style:italic; font-size:14px; color:var(--ink);
+  margin: 10px 0 14px;
+}
+
+/* Forma correcta destacada */
+.fb-correcto-label {
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--ok); margin-bottom:6px; margin-top:14px;
+}
+.fb-correcto-box {
+  background: var(--ok-bg); border:1px solid #a3d4b9;
+  border-left:4px solid var(--ok);
+  border-radius:5px; padding:12px 16px;
+  font-style:italic; font-size:14.5px; color:var(--ink);
+  font-weight:600; margin-bottom:10px;
+}
+.chip { font-family:'JetBrains Mono',monospace; background:rgba(0,0,0,.07); padding:2px 7px; border-radius:3px; font-size:13px; }
+.err-chip { font-family:'JetBrains Mono',monospace; background:var(--err-bg); color:var(--err); border:1px solid #e8b4b4; padding:3px 9px; border-radius:3px; font-size:13px; }
+
+/* EXERCISE CARD */
+.ex-card { background:#fff; border-radius:10px; box-shadow:0 4px 24px var(--shadow); border:1px solid var(--border); margin-bottom:20px; overflow:hidden; }
+.ex-topbar { background:var(--ink); padding:12px 22px; display:flex; align-items:center; gap:12px; }
+.ex-badge { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:4px 12px; border-radius:20px; font-weight:600; }
+.badge-par { background:rgba(201,168,76,.2); color:var(--gold); border:1px solid rgba(201,168,76,.4); }
+.badge-nar { background:rgba(100,180,255,.15); color:#7ec8f5; border:1px solid rgba(100,180,255,.3); }
+.ex-area { font-family:'JetBrains Mono',monospace; font-size:11px; color:rgba(255,255,255,.45); margin-left:auto; letter-spacing:1px; }
+.ex-body { padding:26px 28px 22px; }
+.ex-label { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+.ex-citation { font-size:16px; line-height:1.8; color:var(--ink); background:var(--cream); border-radius:6px; padding:18px 22px; border-left:3px solid var(--border); margin-bottom:22px; font-style:italic; }
+.ans-row { display:flex; gap:10px; justify-content:center; }
+.btn-ans { font-family:'Source Serif 4',serif; font-size:14px; font-weight:600; border:2px solid; border-radius:6px; padding:10px 30px; cursor:pointer; transition:all .18s; white-space:nowrap; }
+.btn-ok  { color:#fff; background:var(--ok);  border-color:var(--ok); }
+.btn-ok:hover  { background:#155233; border-color:#155233; transform:translateY(-1px); }
+.btn-err { color:#fff; background:var(--err); border-color:var(--err); }
+.btn-err:hover { background:#6e1111; border-color:#6e1111; transform:translateY(-1px); }
+.btn-ans:disabled { cursor:default; transform:none !important; opacity:.4; }
+.btn-ans.won { opacity:1 !important; box-shadow:0 0 0 3px rgba(30,107,69,.3); }
+
+.empty-msg { padding:60px 20px; text-align:center; color:var(--muted); font-style:italic; font-size:15px; }
+
+.footer { text-align:center; font-size:12px; color:var(--muted); font-style:italic; margin-top:8px; padding-top:14px; border-top:1px solid var(--border); }
+
+@media(max-width:600px){
+  .ref-panel { grid-template-columns:1fr; }
+  header { padding:22px 18px; }
+  .wrap { padding:0 14px; }
+  .scoreboard { margin-left:0; width:100%; }
+  .ex-body { padding:18px 16px 16px; }
+  .ans-row { flex-direction:column; }
+  .btn-ans { width:100%; text-align:center; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hi">
+    <div class="tag">Normas APA 7.&ordf; edici&oacute;n &middot; Secci&oacute;n 8.11</div>
+    <h1>Simulador de <em>Citas APA</em></h1>
+    <p class="sub">Identifica si la cita es correcta o tiene un error &mdash; paren&eacute;tica vs. narrativa</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="ref-panel">
+    <div class="ref-card">
+      <div class="ref-label">&#128196; Cita Paren&eacute;tica</div>
+      <div class="ref-title">&#201;nfasis en el contenido</div>
+      <div class="ref-desc">Autor y a&ntilde;o van juntos entre par&eacute;ntesis, separados por coma.</div>
+      <div class="ref-fmt">...el texto. (Autor, a&ntilde;o)</div>
+    </div>
+    <div class="ref-card">
+      <div class="ref-label">&#128203; Cita Narrativa</div>
+      <div class="ref-title">&#201;nfasis en el autor</div>
+      <div class="ref-desc">El apellido se integra al texto; solo el a&ntilde;o va entre par&eacute;ntesis inmediatamente despu&eacute;s.</div>
+      <div class="ref-fmt">Autor (a&ntilde;o) se&ntilde;al&oacute; que...</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-gen" onclick="generar()">&#8635;&nbsp; Nueva cita aleatoria</button>
+    <button class="btn-rst" onclick="resetear()">&#8634;&nbsp; Reset puntaje</button>
+    <div class="scoreboard">
+      <div class="sc-item"><strong id="n-ok">0</strong><span>Correctas</span></div>
+      <div class="sc-item"><strong id="n-err">0</strong><span>Errores</span></div>
+      <div class="sc-item"><strong id="n-tot">0</strong><span>Total</span></div>
+    </div>
+  </div>
+
+  <div class="prog-wrap"><div class="prog-fill" id="prog"></div></div>
+
+  <div class="feedback" id="fb">
+    <div class="fb-head">
+      <span class="fb-icon" id="fb-icon"></span>
+      <span class="fb-title" id="fb-title"></span>
+    </div>
+    <div class="fb-body" id="fb-body"></div>
+  </div>
+
+  <div class="ex-card" id="ex-card">
+    <div class="empty-msg">
+      Presiona <strong>Nueva cita aleatoria</strong> para comenzar
+    </div>
+  </div>
+
+  <div class="footer">
+    Manual de Publicaciones APA &middot; 7.&ordf; edici&oacute;n &middot; Secci&oacute;n 8.11
+  </div>
+</div>
+
+<script>
+var CITAS = [
+
+  // ═══════════════════════════════════════════════
+  // MARKETING — Kotler, Armstrong, Porter, Ries, Trout, Aaker
+  // ═══════════════════════════════════════════════
+
+  {tipo:"par", area:"Marketing", correcta:true,
+   cita:"La segmentacion de mercado permite enfocar recursos de manera eficiente (Kotler y Armstrong, 2018).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta: autor y año entre parentesis al final, separados por coma. Con dos autores se usa 'y' en español."},
+
+  {tipo:"nar", area:"Marketing", correcta:true,
+   cita:"Kotler y Armstrong (2018) sostienen que el marketing mix es la herramienta central para la gestion comercial.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta: apellidos integrados como sujeto de la oracion, año entre parentesis inmediatamente despues."},
+
+  {tipo:"par", area:"Marketing", correcta:false,
+   cita:"La fidelizacion del cliente es un objetivo central del marketing relacional (Kotler 2018).",
+   error_desc:"Falta la coma entre el autor y el año dentro del parentesis.",
+   correcta_forma:"La fidelizacion del cliente es un objetivo central del marketing relacional (Kotler, 2018).",
+   explicacion:"En la cita parentetica el autor y el año se separan obligatoriamente con una coma."},
+
+  {tipo:"par", area:"Marketing", correcta:false,
+   cita:"El marketing digital ha ampliado el alcance de las marcas globales. (Kotler y Armstrong, 2018).",
+   error_desc:"Hay un punto antes del parentesis. El punto final va DESPUES del parentesis de cierre.",
+   correcta_forma:"El marketing digital ha ampliado el alcance de las marcas globales (Kotler y Armstrong, 2018).",
+   explicacion:"Cuando la cita parentetica cierra la oracion, el punto va despues del parentesis, no antes."},
+
+  {tipo:"nar", area:"Marketing", correcta:false,
+   cita:"Kotler y Armstrong señalan (2018) que la propuesta de valor debe ser clara y diferenciada.",
+   error_desc:"El año debe ir entre parentesis INMEDIATAMENTE despues del apellido, no despues del verbo.",
+   correcta_forma:"Kotler y Armstrong (2018) señalan que la propuesta de valor debe ser clara y diferenciada.",
+   explicacion:"En la cita narrativa el año va pegado al apellido del autor, no al verbo introductorio."},
+
+  {tipo:"nar", area:"Marketing", correcta:false,
+   cita:"(Kotler, 2016) afirma que el marketing es un proceso social y de gestion.",
+   error_desc:"En la cita narrativa el autor NO va entre parentesis.",
+   correcta_forma:"Kotler (2016) afirma que el marketing es un proceso social y de gestion.",
+   explicacion:"Si el autor es el sujeto de la oracion, su nombre va en el texto libre. Solo el año va entre parentesis."},
+
+  {tipo:"par", area:"Marketing", correcta:false,
+   cita:"La estrategia de precios debe alinearse con el posicionamiento de la marca (Kotler, Armstrong, 2018).",
+   error_desc:"Dos autores se unen con 'y', no con coma.",
+   correcta_forma:"La estrategia de precios debe alinearse con el posicionamiento de la marca (Kotler y Armstrong, 2018).",
+   explicacion:"Con dos autores siempre se usa 'y' (en español) dentro del parentesis, no coma."},
+
+  {tipo:"par", area:"Marketing", correcta:true,
+   cita:"El posicionamiento de marca es el proceso de diseñar la imagen de la empresa en la mente del consumidor (Ries y Trout, 2000).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta con dos autores. Estructura impecable."},
+
+  {tipo:"nar", area:"Marketing", correcta:true,
+   cita:"Ries y Trout (2000) argumentan que el posicionamiento no se crea en el producto, sino en la mente del consumidor.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta. Los apellidos integrados como sujeto, año entre parentesis justo despues."},
+
+  {tipo:"nar", area:"Marketing", correcta:false,
+   cita:"Aaker señalo en el 2012 que el valor de marca es un activo estrategico intangible fundamental.",
+   error_desc:"El año debe ir entre parentesis: Aaker (2012), no escrito en el texto corrido junto al nombre.",
+   correcta_forma:"Aaker (2012) señalo que el valor de marca es un activo estrategico intangible fundamental.",
+   explicacion:"Solo es valido escribir el año en el texto sin parentesis cuando TAMBIEN el nombre del autor esta en el texto de forma completamente integrada y natural: 'En 2012, Aaker señalo que...'. Mezclar 'en el 2012' pegado al nombre es incorrecto."},
+
+  {tipo:"par", area:"Marketing", correcta:true,
+   cita:"La lealtad de marca genera ventajas competitivas sostenibles en mercados saturados (Aaker, 2012).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. Estructura limpia: contenido relevante (Autor, año)."},
+
+  {tipo:"nar", area:"Marketing", correcta:false,
+   cita:"Segun (Kotler, 2016) las necesidades del cliente deben ser el punto de partida de cualquier estrategia.",
+   error_desc:"'Segun' introduce cita narrativa: el autor NO va entre parentesis.",
+   correcta_forma:"Segun Kotler (2016), las necesidades del cliente deben ser el punto de partida de cualquier estrategia.",
+   explicacion:"'Segun' es una preposicion que introduce el nombre del autor directamente en el texto. Solo el año va entre parentesis."},
+
+  {tipo:"par", area:"Marketing", correcta:false,
+   cita:"El neuromarketing permite comprender los procesos inconscientes del comportamiento del consumidor (Kotler, Philip, 2016).",
+   error_desc:"Solo se usa el APELLIDO en la cita. Nunca el nombre de pila.",
+   correcta_forma:"El neuromarketing permite comprender los procesos inconscientes del comportamiento del consumidor (Kotler, 2016).",
+   explicacion:"APA 7 usa exclusivamente el apellido del autor en las citas dentro del texto, nunca el nombre propio."},
+
+  // ═══════════════════════════════════════════════
+  // ADMINISTRACION — Drucker, Porter, Mintzberg, Robbins, Kotter, Kaplan
+  // ═══════════════════════════════════════════════
+
+  {tipo:"par", area:"Administracion", correcta:true,
+   cita:"La gestion por objetivos permite alinear las metas individuales con los objetivos organizacionales (Drucker, 2002).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. Enfasis en el contenido; referencia entre parentesis al final."},
+
+  {tipo:"nar", area:"Administracion", correcta:true,
+   cita:"Porter (2008) argumenta que la ventaja competitiva sostenible proviene de actividades integradas en la cadena de valor.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta. El verbo 'argumenta' es apropiado y el año va inmediatamente despues del apellido."},
+
+  {tipo:"nar", area:"Administracion", correcta:false,
+   cita:"Drucker 2002 sostiene que la innovacion es la funcion especifica del espiritu empresarial.",
+   error_desc:"El año debe ir entre parentesis en la cita narrativa.",
+   correcta_forma:"Drucker (2002) sostiene que la innovacion es la funcion especifica del espiritu empresarial.",
+   explicacion:"En la cita narrativa el año SIEMPRE va entre parentesis justo despues del apellido."},
+
+  {tipo:"par", area:"Administracion", correcta:false,
+   cita:"(Porter, 2008) Las cinco fuerzas del mercado condicionan la rentabilidad sectorial.",
+   error_desc:"La cita parentetica nunca inicia la oracion. Va al final o dentro de ella.",
+   correcta_forma:"Las cinco fuerzas del mercado condicionan la rentabilidad sectorial (Porter, 2008).",
+   explicacion:"La cita parentetica es una referencia de apoyo que va al cierre o dentro de la oracion, nunca al inicio."},
+
+  {tipo:"par", area:"Administracion", correcta:false,
+   cita:"La cultura organizacional es el factor diferenciador mas importante en las empresas exitosas (Drucker, Peter, 2002).",
+   error_desc:"Solo se usa el apellido, nunca el nombre de pila.",
+   correcta_forma:"La cultura organizacional es el factor diferenciador mas importante en las empresas exitosas (Drucker, 2002).",
+   explicacion:"APA 7 exige solo el apellido del autor en las citas. El nombre de pila se usa unicamente en la lista de referencias."},
+
+  {tipo:"nar", area:"Administracion", correcta:false,
+   cita:"Segun Porter (2008), afirma que la diferenciacion es una estrategia competitiva clave.",
+   error_desc:"No combinar 'Segun Autor (año)' con un verbo de atribucion como 'afirma'. Es redundante.",
+   correcta_forma:"Segun Porter (2008), la diferenciacion es una estrategia competitiva clave.",
+   explicacion:"'Segun Porter (2008)' ya atribuye la idea. Añadir 'afirma que' es redundante. Se elige una forma: 'Porter (2008) afirma que...' O 'Segun Porter (2008), ...'"},
+
+  {tipo:"par", area:"Administracion", correcta:true,
+   cita:"La planificacion estrategica es una herramienta esencial para la sostenibilidad organizacional (Mintzberg, 1994).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. Estructura clasica y limpia."},
+
+  {tipo:"nar", area:"Administracion", correcta:true,
+   cita:"Mintzberg (1994) distingue entre la planificacion deliberada y la estrategia emergente como dos modos complementarios.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta. Apellido integrado, año entre parentesis inmediatamente despues."},
+
+  {tipo:"par", area:"Administracion", correcta:true,
+   cita:"El liderazgo del cambio requiere un proceso de ocho etapas para transformar las organizaciones (Kotter, 1996).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. Referencia al final con la estructura estandar Autor, año."},
+
+  {tipo:"nar", area:"Administracion", correcta:true,
+   cita:"Kotter (1996) propone que el primer paso del cambio organizacional es crear un sentido de urgencia.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta. El verbo 'propone' es un introductorio adecuado."},
+
+  {tipo:"nar", area:"Administracion", correcta:false,
+   cita:"En el año 2004, Kaplan y Norton (2004) desarrollaron el concepto del cuadro de mando integral.",
+   error_desc:"El año no debe aparecer dos veces: ni en el texto y en el parentesis a la vez.",
+   correcta_forma:"En 2004, Kaplan y Norton desarrollaron el concepto del cuadro de mando integral.",
+   explicacion:"Si el año ya aparece en el texto corrido, no se repite entre parentesis. Dos opciones validas: 'Kaplan y Norton (2004) desarrollaron...' o 'En 2004, Kaplan y Norton desarrollaron...'"},
+
+  {tipo:"par", area:"Administracion", correcta:true,
+   cita:"El cuadro de mando integral traduce la estrategia en objetivos medibles en cuatro perspectivas (Kaplan y Norton, 2004).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta con dos autores unidos por 'y'."},
+
+  {tipo:"nar", area:"Administracion", correcta:false,
+   cita:"Robbins y Coulter (2014) y Drucker (2002) coinciden en que la efectividad organizacional depende del liderazgo.",
+   error_desc:"Cuando se citan multiples fuentes narrativas en la misma oracion, es preferible usar cita parentetica para las adicionales.",
+   correcta_forma:"Robbins y Coulter (2014) coinciden con Drucker (2002) en que la efectividad organizacional depende del liderazgo.",
+   explicacion:"APA 7 permite mencionar multiples autores narrativamente, pero la redaccion debe ser clara y fluir bien. Usar un conector ('coinciden con') es mas elegante que yuxtaponer citas narrativas con 'y'."},
+
+  {tipo:"par", area:"Administracion", correcta:true,
+   cita:"La administracion es el proceso de planificar, organizar, dirigir y controlar el uso de recursos para lograr objetivos (Robbins y Coulter, 2014).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. Definicion con referencia al final."},
+
+  // ═══════════════════════════════════════════════
+  // RECURSOS HUMANOS — Chiavenato, Dessler, Werther, Davis, Mondy, Maslow
+  // ═══════════════════════════════════════════════
+
+  {tipo:"par", area:"Recursos Humanos", correcta:true,
+   cita:"La gestion del talento humano es un factor estrategico para la competitividad organizacional (Chiavenato, 2009).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. El contenido es el foco; la referencia va entre parentesis."},
+
+  {tipo:"nar", area:"Recursos Humanos", correcta:true,
+   cita:"Chiavenato (2009) define la gestion del talento como el conjunto de politicas necesarias para administrar el trabajo de las personas.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta. Apellido integrado, año entre parentesis justo despues."},
+
+  {tipo:"nar", area:"Recursos Humanos", correcta:false,
+   cita:"Chiavenato, 2009 afirma que la motivacion es el resultado de la interaccion entre el individuo y la situacion.",
+   error_desc:"El año debe ir entre parentesis, no separado por coma en el texto libre.",
+   correcta_forma:"Chiavenato (2009) afirma que la motivacion es el resultado de la interaccion entre el individuo y la situacion.",
+   explicacion:"En la cita narrativa el año siempre va entre parentesis inmediatamente despues del apellido."},
+
+  {tipo:"par", area:"Recursos Humanos", correcta:false,
+   cita:"El liderazgo transformacional genera mayor compromiso organizacional (Chiavenato 2011).",
+   error_desc:"Falta la coma entre autor y año dentro del parentesis.",
+   correcta_forma:"El liderazgo transformacional genera mayor compromiso organizacional (Chiavenato, 2011).",
+   explicacion:"Dentro del parentesis, autor y año se separan obligatoriamente con una coma."},
+
+  {tipo:"nar", area:"Recursos Humanos", correcta:false,
+   cita:"Segun (Chiavenato, 2009) la administracion de recursos humanos ha evolucionado hacia un enfoque estrategico.",
+   error_desc:"'Segun' introduce cita narrativa: el autor no va entre parentesis.",
+   correcta_forma:"Segun Chiavenato (2009), la administracion de recursos humanos ha evolucionado hacia un enfoque estrategico.",
+   explicacion:"'Segun' es preposicion que introduce el apellido directamente en el texto. Solo el año va entre parentesis."},
+
+  {tipo:"par", area:"Recursos Humanos", correcta:false,
+   cita:"La capacitacion continua incrementa el desempeño y reduce la rotacion del personal. (Chiavenato, 2009).",
+   error_desc:"El punto va DESPUES del parentesis de cierre, no antes.",
+   correcta_forma:"La capacitacion continua incrementa el desempeño y reduce la rotacion del personal (Chiavenato, 2009).",
+   explicacion:"El punto final de la oracion va siempre despues del parentesis, nunca antes."},
+
+  {tipo:"par", area:"Recursos Humanos", correcta:true,
+   cita:"Los procesos de seleccion deben alinearse con la estrategia corporativa para incorporar el talento adecuado (Dessler y Varela, 2011).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta con dos autores unidos por 'y'."},
+
+  {tipo:"nar", area:"Recursos Humanos", correcta:true,
+   cita:"Dessler y Varela (2011) señalan que el proceso de reclutamiento debe basarse en el perfil competencial del puesto.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta con dos autores."},
+
+  {tipo:"par", area:"Recursos Humanos", correcta:true,
+   cita:"La administracion de recursos humanos implica la planeacion, organizacion y control de las actividades relacionadas con las personas (Werther y Davis, 2008).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. Definicion formal con referencia al final."},
+
+  {tipo:"nar", area:"Recursos Humanos", correcta:false,
+   cita:"Werther y Davis señalaron (en 2008) que la evaluacion del desempeño es clave para la mejora continua.",
+   error_desc:"El año va entre parentesis DIRECTAMENTE despues del apellido, sin 'en' ni texto adicional.",
+   correcta_forma:"Werther y Davis (2008) señalaron que la evaluacion del desempeño es clave para la mejora continua.",
+   explicacion:"El parentesis del año en la cita narrativa solo contiene el año. No se agrega 'en', 'en el año', ni ninguna otra palabra."},
+
+  {tipo:"par", area:"Recursos Humanos", correcta:true,
+   cita:"La compensacion salarial debe ser competitiva y equitativa para retener al talento clave (Mondy, 2010).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica correcta. Estructura impecable."},
+
+  {tipo:"nar", area:"Recursos Humanos", correcta:true,
+   cita:"Mondy (2010) distingue entre compensacion directa e indirecta como componentes del sistema de remuneracion.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta. El verbo 'distingue' es un introductorio adecuado."},
+
+  {tipo:"par", area:"Recursos Humanos", correcta:false,
+   cita:"Las necesidades humanas se organizan jerarquicamente, desde las fisiologicas hasta la autorrealizacion (Maslow, Abraham, 1943).",
+   error_desc:"Solo se usa el apellido. El nombre de pila no se incluye en la cita.",
+   correcta_forma:"Las necesidades humanas se organizan jerarquicamente, desde las fisiologicas hasta la autorrealizacion (Maslow, 1943).",
+   explicacion:"APA 7 exige solo el apellido del autor en las citas en el texto. El nombre completo va unicamente en la lista de referencias."},
+
+  {tipo:"nar", area:"Recursos Humanos", correcta:true,
+   cita:"Maslow (1943) propone que las necesidades humanas se organizan en una jerarquia de cinco niveles.",
+   correcta_forma: null,
+   explicacion:"Cita narrativa correcta. Apellido integrado, año entre parentesis inmediatamente despues."},
+
+  // ═══════════════════════════════════════════════
+  // CASOS ESPECIALES APA 7
+  // ═══════════════════════════════════════════════
+
+  {tipo:"par", area:"APA Avanzado", correcta:true,
+   cita:"(Para mayor detalle, vease Kotler y Armstrong, 2018).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica con texto adicional: correcto. Cuando hay texto junto a la referencia dentro del parentesis, se separan con coma."},
+
+  {tipo:"par", area:"APA Avanzado", correcta:true,
+   cita:"Diversas investigaciones respaldan la importancia del liderazgo en el desempeño (Chiavenato, 2011; Drucker, 2002; Kotter, 1996).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica con multiples fuentes: correcto. Se separan con punto y coma dentro de un solo parentesis."},
+
+  {tipo:"par", area:"APA Avanzado", correcta:false,
+   cita:"El enfoque en el cliente es fundamental para el exito comercial (Kotler y Armstrong, 2018) (Porter, 2015).",
+   error_desc:"Multiples citas van en un SOLO parentesis separadas por punto y coma, no en parentesis separados.",
+   correcta_forma:"El enfoque en el cliente es fundamental para el exito comercial (Kotler y Armstrong, 2018; Porter, 2015).",
+   explicacion:"APA 7 exige que todas las fuentes parenteticas de una misma idea vayan en un solo parentesis, separadas por punto y coma."},
+
+  {tipo:"nar", area:"APA Avanzado", correcta:true,
+   cita:"En 2002, Drucker advirtio que la sociedad del conocimiento exigiria nuevas formas de gestion organizacional.",
+   correcta_forma: null,
+   explicacion:"Caso especial correcto: cuando el año Y el nombre del autor aparecen de forma natural en el texto corrido, no se usan parentesis. APA 7 permite esta forma excepcional."},
+
+  {tipo:"nar", area:"APA Avanzado", correcta:false,
+   cita:"Porter señalo (en el año 2008) que las empresas deben elegir una estrategia competitiva clara.",
+   error_desc:"El año va entre parentesis DIRECTAMENTE despues del apellido, sin texto adicional.",
+   correcta_forma:"Porter (2008) señalo que las empresas deben elegir una estrategia competitiva clara.",
+   explicacion:"El parentesis del año en cita narrativa contiene solo el año numerico. No se escribe 'en el año', 'año', ni ninguna otra palabra adicional."},
+
+  {tipo:"par", area:"APA Avanzado", correcta:false,
+   cita:"El marketing relacional se centra en construir relaciones a largo plazo con el cliente (vease: Kotler, 2016).",
+   error_desc:"No se usan dos puntos despues de 'vease' dentro del parentesis.",
+   correcta_forma:"El marketing relacional se centra en construir relaciones a largo plazo con el cliente (vease Kotler, 2016).",
+   explicacion:"La formula 'vease' dentro de una cita parentetica no lleva dos puntos. Correcto: (vease Kotler, 2016)."},
+
+  {tipo:"par", area:"APA Avanzado", correcta:true,
+   cita:"La estrategia competitiva requiere una eleccion clara entre diferenciacion, liderazgo en costos o enfoque (Porter, 2008, p. 56).",
+   correcta_forma: null,
+   explicacion:"Cita parentetica con numero de pagina: correcto segun APA 7. Se añade 'p.' seguido del numero cuando se cita textualmente o se quiere señalar una ubicacion especifica."}
+
+];
+
+// ── ESTADO ────────────────────────────────────────────────────────────────
+var ok=0, err=0, tot=0, answered=false, estado={};
+
+function resetear() {
+  ok=0; err=0; tot=0;
+  document.getElementById('n-ok').textContent  = '0';
+  document.getElementById('n-err').textContent = '0';
+  document.getElementById('n-tot').textContent = '0';
+  document.getElementById('prog').style.width  = '0%';
+}
+
+function generar() {
+  var item = CITAS[Math.floor(Math.random() * CITAS.length)];
+  answered = false;
+  estado   = item;
+
+  var badgeClass = item.tipo === 'par' ? 'badge-par' : 'badge-nar';
+  var badgeText  = item.tipo === 'par' ? '&#128196; Parentetica' : '&#128203; Narrativa';
+
+  document.getElementById('ex-card').innerHTML =
+    '<div class="ex-topbar">' +
+      '<span class="ex-badge ' + badgeClass + '">' + badgeText + '</span>' +
+      '<span class="ex-area">' + item.area + '</span>' +
+    '</div>' +
+    '<div class="ex-body">' +
+      '<div class="ex-label">Analiza esta cita:</div>' +
+      '<div class="ex-citation">' + item.cita + '</div>' +
+      '<div class="ans-row">' +
+        '<button class="btn-ans btn-ok"  id="btn-ok"  onclick="responder(true)">&#10003;&nbsp; Es correcta</button>' +
+        '<button class="btn-ans btn-err" id="btn-err" onclick="responder(false)">&#10007;&nbsp; Tiene un error</button>' +
+      '</div>' +
+    '</div>';
+
+  document.getElementById('fb').className = 'feedback';
+}
+
+function responder(userDiceCorrecta) {
+  if (answered) return;
+  answered = true;
+
+  var esCorrecta = estado.correcta;
+  var acierto    = (userDiceCorrecta === esCorrecta);
+
+  tot++;
+  if (acierto) { ok++; } else { err++; }
+  document.getElementById('n-ok').textContent  = ok;
+  document.getElementById('n-err').textContent = err;
+  document.getElementById('n-tot').textContent = tot;
+  document.getElementById('prog').style.width  = Math.round((ok/tot)*100) + '%';
+
+  var btnOk  = document.getElementById('btn-ok');
+  var btnErr = document.getElementById('btn-err');
+  btnOk.disabled  = true;
+  btnErr.disabled = true;
+  if (acierto) {
+    if (userDiceCorrecta) { btnOk.classList.add('won'); } else { btnErr.classList.add('won'); }
+  }
+
+  var fb    = document.getElementById('fb');
+  var icon  = document.getElementById('fb-icon');
+  var title = document.getElementById('fb-title');
+  var body  = document.getElementById('fb-body');
+
+  // Bloque: cita analizada
+  var citaUsadaHTML =
+    '<div style="margin:8px 0 6px"><strong>Cita analizada:</strong></div>' +
+    '<div class="fb-cita-usada">' + estado.cita + '</div>';
+
+  // Bloque: forma correcta (solo si habia error)
+  var correctaHTML = '';
+  if (!esCorrecta && estado.correcta_forma) {
+    correctaHTML =
+      '<div class="fb-correcto-label">&#10003; Forma correcta:</div>' +
+      '<div class="fb-correcto-box">' + estado.correcta_forma + '</div>';
+  }
+
+  if (acierto) {
+    fb.className = 'feedback ok';
+    icon.textContent  = '🎯';
+    title.textContent = '¡Correcto!';
+    if (esCorrecta) {
+      body.innerHTML =
+        citaUsadaHTML +
+        '<strong>La cita ES correcta.</strong> Tipo: ' + (estado.tipo === 'par' ? 'Parentetica' : 'Narrativa') + '.<br><br>' +
+        estado.explicacion;
+    } else {
+      body.innerHTML =
+        citaUsadaHTML +
+        '<strong>Detectaste el error correctamente.</strong><br><br>' +
+        '<strong>Error:</strong> <span class="err-chip">' + estado.error_desc + '</span><br>' +
+        correctaHTML +
+        estado.explicacion;
+    }
+  } else {
+    fb.className = 'feedback err';
+    icon.textContent  = '💡';
+    title.textContent = 'Incorrecto — revisemos APA 7';
+    if (esCorrecta) {
+      body.innerHTML =
+        citaUsadaHTML +
+        '<strong>La cita en realidad ES correcta.</strong><br><br>' +
+        estado.explicacion;
+    } else {
+      body.innerHTML =
+        citaUsadaHTML +
+        '<strong>La cita SI tiene un error que no detectaste.</strong><br><br>' +
+        '<strong>Error:</strong> <span class="err-chip">' + estado.error_desc + '</span><br>' +
+        correctaHTML +
+        estado.explicacion;
+    }
+  }
+
+  setTimeout(function(){
+    fb.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }, 60);
+}
+</script>
+</body>
+</html>
